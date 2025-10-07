@@ -18,6 +18,8 @@ type Capturer struct {
 	storage       storage.Storage
 	running       bool
 	mu            sync.RWMutex
+	domainMap     map[string]string // IP到域名的映射
+	domainMu      sync.RWMutex      // 保护domainMap的互斥锁
 }
 
 func NewCapturer(interfaceName string, storage storage.Storage) (*Capturer, error) {
@@ -27,7 +29,7 @@ func NewCapturer(interfaceName string, storage storage.Storage) (*Capturer, erro
 	}
 
 	// 设置过滤器，只捕获HTTP/HTTPS流量
-	err = handle.SetBPFFilter("tcp port 80 or tcp port 443 or tcp port 8080 or tcp port 3000")
+	err = handle.SetBPFFilter("tcp port 80 or tcp port 443 or tcp port 8080 or tcp port 3000 or udp port 53")
 	if err != nil {
 		return nil, fmt.Errorf("设置BPF过滤器失败: %v", err)
 	}
@@ -37,6 +39,7 @@ func NewCapturer(interfaceName string, storage storage.Storage) (*Capturer, erro
 		handle:        handle,
 		storage:       storage,
 		running:       false,
+		domainMap:     make(map[string]string),
 	}, nil
 }
 
@@ -80,6 +83,8 @@ func (c *Capturer) processPacket(packet gopacket.Packet) {
 	// 解析传输层
 	transportLayer := packet.TransportLayer()
 	if transportLayer == nil {
+		// 添加调试日志，查看没有传输层的数据包
+		// fmt.Printf("无传输层数据包: %v\n", packet.Dump())
 		return
 	}
 
@@ -95,11 +100,15 @@ func (c *Capturer) processPacket(packet gopacket.Packet) {
 		packetInfo.SrcIP = ipv4.SrcIP.String()
 		packetInfo.DstIP = ipv4.DstIP.String()
 		packetInfo.Protocol = "IPv4"
+		// 收集域名信息（从DNS解析中）
+		c.collectDomainFromDNS(packet, packetInfo)
 	case layers.LayerTypeIPv6:
 		ipv6 := networkLayer.(*layers.IPv6)
 		packetInfo.SrcIP = ipv6.SrcIP.String()
 		packetInfo.DstIP = ipv6.DstIP.String()
 		packetInfo.Protocol = "IPv6"
+		// 收集域名信息（从DNS解析中）
+		c.collectDomainFromDNS(packet, packetInfo)
 	}
 
 	// 解析传输层
@@ -117,15 +126,99 @@ func (c *Capturer) processPacket(packet gopacket.Packet) {
 			c.parseHTTP(packet, packetInfo)
 		}
 
+		// 通过IP地址查找域名
+		c.domainMu.RLock()
+		if domain, exists := c.domainMap[packetInfo.DstIP]; exists {
+			packetInfo.Domain = domain
+		} else if domain, exists := c.domainMap[packetInfo.SrcIP]; exists {
+			packetInfo.Domain = domain
+		}
+		c.domainMu.RUnlock()
+
 		// 调试信息：如果目标IP是139.155.132.244，打印调试信息
-		if packetInfo.DstIP == "139.155.132.244" || packetInfo.SrcIP == "139.155.132.244" {
+		if packetInfo.DstIP == "139.155.132.244" || packetInfo.SrcIP == "139.155.132.244" ||
+			packetInfo.DstIP == "192.168.222.127" || packetInfo.SrcIP == "192.168.222.127" ||
+			packetInfo.DstIP == "39.101.26.24" || packetInfo.SrcIP == "39.101.26.24" {
 			fmt.Printf("调试: 捕获到目标IP %s 的数据包，域名: %s, Host: %s\n",
 				packetInfo.DstIP, packetInfo.Domain, packetInfo.Host)
+		}
+	case layers.LayerTypeUDP:
+		udp := transportLayer.(*layers.UDP)
+		packetInfo.SrcPort = uint16(udp.SrcPort)
+		packetInfo.DstPort = uint16(udp.DstPort)
+		packetInfo.Protocol = "UDP"
+
+		// 添加调试日志，查看UDP数据包
+		if packetInfo.DstIP == "139.155.132.244" || packetInfo.SrcIP == "139.155.132.244" ||
+			packetInfo.DstIP == "192.168.222.127" || packetInfo.SrcIP == "192.168.222.127" ||
+			packetInfo.DstIP == "39.101.26.24" || packetInfo.SrcIP == "39.101.26.24" {
+			fmt.Printf("UDP数据包: SrcIP=%s, DstIP=%s, SrcPort=%d, DstPort=%d\n",
+				packetInfo.SrcIP, packetInfo.DstIP, packetInfo.SrcPort, packetInfo.DstPort)
+		}
+
+		// 检查是否是DNS流量
+		if packetInfo.DstPort == 53 || packetInfo.SrcPort == 53 {
+			if packetInfo.DstIP == "139.155.132.244" || packetInfo.SrcIP == "139.155.132.244" ||
+				packetInfo.DstIP == "192.168.222.127" || packetInfo.SrcIP == "192.168.222.127" ||
+				packetInfo.DstIP == "39.101.26.24" || packetInfo.SrcIP == "39.101.26.24" {
+				fmt.Printf("DNS UDP数据包: SrcIP=%s, DstIP=%s, SrcPort=%d, DstPort=%d\n",
+					packetInfo.SrcIP, packetInfo.DstIP, packetInfo.SrcPort, packetInfo.DstPort)
+			}
+			c.collectDomainFromDNS(packet, packetInfo)
 		}
 	}
 
 	// 存储数据包信息
 	c.storage.StorePacket(packetInfo)
+}
+
+// collectDomainFromDNS 从DNS数据包中收集域名信息
+func (c *Capturer) collectDomainFromDNS(packet gopacket.Packet, packetInfo *storage.PacketInfo) {
+	// 检查是否是DNS数据包
+	if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
+		dns, _ := dnsLayer.(*layers.DNS)
+
+		// 添加调试日志
+		fmt.Printf("DNS数据包捕获: OpCode=%v, QR=%v, 问题数=%d, 答案数=%d\n",
+			dns.OpCode, dns.QR, len(dns.Questions), len(dns.Answers))
+
+		if dns.OpCode == layers.DNSOpCodeQuery && len(dns.Questions) > 0 {
+			// 从DNS查询中提取域名
+			domain := string(dns.Questions[0].Name)
+			packetInfo.Domain = domain
+			fmt.Printf("DNS查询域名: %s\n", domain)
+
+			// 如果是DNS响应且包含答案
+			if dns.QR && len(dns.Answers) > 0 {
+				fmt.Printf("DNS响应，答案数: %d\n", len(dns.Answers))
+				for i, answer := range dns.Answers {
+					// 记录域名和IP的映射关系，可用于后续数据包的域名解析
+					if answer.IP != nil {
+						fmt.Printf("DNS答案[%d]: 域名=%s, IP=%s\n", i, string(answer.Name), answer.IP.String())
+						// 存储域名和IP的映射关系
+						c.domainMu.Lock()
+						c.domainMap[answer.IP.String()] = string(answer.Name)
+						c.domainMu.Unlock()
+
+						// 这里可以存储域名和IP的映射关系，供其他数据包使用
+						// 简化起见，我们只在当前数据包中记录
+						if answer.IP.String() == packetInfo.SrcIP || answer.IP.String() == packetInfo.DstIP {
+							packetInfo.Domain = string(answer.Name)
+							fmt.Printf("匹配IP地址，设置域名: %s\n", packetInfo.Domain)
+						}
+					}
+				}
+			}
+		}
+	} else {
+		// 检查是否是UDP 53端口的数据包但没有DNS层
+		if (packetInfo.SrcPort == 53 || packetInfo.DstPort == 53) &&
+			(packetInfo.DstIP == "139.155.132.244" || packetInfo.SrcIP == "139.155.132.244" ||
+				packetInfo.DstIP == "192.168.222.127" || packetInfo.SrcIP == "192.168.222.127") {
+			fmt.Printf("UDP 53端口数据包但无DNS层: SrcIP=%s, DstIP=%s, SrcPort=%d, DstPort=%d\n",
+				packetInfo.SrcIP, packetInfo.DstIP, packetInfo.SrcPort, packetInfo.DstPort)
+		}
+	}
 }
 
 func (c *Capturer) parseHTTP(packet gopacket.Packet, packetInfo *storage.PacketInfo) {
