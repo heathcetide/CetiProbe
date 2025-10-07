@@ -53,6 +53,17 @@
                     <option value="DELETE">DELETE</option>
                     <option value="HEAD">HEAD</option>
                 </select>
+            </div>
+            <div class="filter-row">
+                <input type="text" id="host" placeholder="主机名 (如: example.com)">
+                <input type="text" id="domain" placeholder="域名 (如: example.com)">
+                <input type="text" id="path" placeholder="路径 (如: /api/users)">
+                <input type="text" id="user-agent" placeholder="User-Agent">
+                <input type="text" id="content-type" placeholder="Content-Type">
+                <input type="text" id="referer" placeholder="Referer">
+                <input type="text" id="server" placeholder="Server">
+            </div>
+            <div class="filter-row">
                 <input type="text" id="search-text" placeholder="搜索文本">
                 <button id="filter-btn" class="btn btn-primary">应用过滤</button>
                 <button id="reset-filter-btn" class="btn btn-secondary">重置</button>
@@ -70,10 +81,12 @@
                             <th>目标IP:端口</th>
                             <th>协议</th>
                             <th>长度</th>
+                            <th>域名</th>
+                            <th>路径</th>
                             <th>HTTP方法</th>
-                            <th>URL</th>
                             <th>状态</th>
                             <th>User Agent</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="packets-tbody">

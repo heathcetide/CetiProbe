@@ -303,6 +303,206 @@ header h1 {
     color: #6c757d;
 }
 
+.domain-cell {
+    font-family: monospace;
+    font-size: 0.9em;
+    color: #007bff;
+    font-weight: 500;
+}
+
+.path-cell {
+    font-family: monospace;
+    font-size: 0.85em;
+    color: #6c757d;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 过滤状态指示器 */
+.filter-status {
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.filter-status.active {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.filter-status.inactive {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+/* 详情按钮样式 */
+.btn-detail {
+    padding: 4px 8px;
+    font-size: 0.8em;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.btn-detail:hover {
+    background-color: #0056b3;
+}
+
+.action-cell {
+    text-align: center;
+    width: 80px;
+}
+
+/* 模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 2% auto;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.close {
+    color: white;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+
+.close:hover {
+    opacity: 0.7;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.detail-section {
+    margin-bottom: 25px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.detail-section h4 {
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 12px 15px;
+    font-size: 1.1em;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+.detail-table tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.detail-table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid #dee2e6;
+    vertical-align: top;
+}
+
+.detail-table td:first-child {
+    font-weight: 600;
+    color: #495057;
+    width: 200px;
+    background-color: #e9ecef;
+}
+
+.detail-table td:last-child {
+    font-family: monospace;
+    word-break: break-all;
+    max-width: 400px;
+}
+
+.payload-content {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    font-family: monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    max-height: 300px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    text-align: right;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        margin: 5% auto;
+    }
+    
+    .detail-table td:first-child {
+        width: 150px;
+    }
+    
+    .detail-table td:last-child {
+        max-width: 200px;
+    }
+}
+
 .loading {
     text-align: center;
     padding: 40px;

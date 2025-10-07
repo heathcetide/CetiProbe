@@ -2,6 +2,7 @@ package capture
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,8 +19,6 @@ type Capturer struct {
 	running       bool
 	mu            sync.RWMutex
 }
-
-// PacketInfo 已移动到 storage 包中，这里不再重复定义
 
 func NewCapturer(interfaceName string, storage storage.Storage) (*Capturer, error) {
 	handle, err := pcap.OpenLive(interfaceName, 1600, true, pcap.BlockForever)
@@ -111,9 +110,17 @@ func (c *Capturer) processPacket(packet gopacket.Packet) {
 		packetInfo.DstPort = uint16(tcp.DstPort)
 		packetInfo.Protocol = "TCP"
 
-		// 检查是否是HTTP流量
-		if packetInfo.DstPort == 80 || packetInfo.SrcPort == 80 {
+		// 检查是否是HTTP流量 - 扩展端口检测
+		if packetInfo.DstPort == 80 || packetInfo.SrcPort == 80 ||
+			packetInfo.DstPort == 8080 || packetInfo.SrcPort == 8080 ||
+			packetInfo.DstPort == 3000 || packetInfo.SrcPort == 3000 {
 			c.parseHTTP(packet, packetInfo)
+		}
+
+		// 调试信息：如果目标IP是139.155.132.244，打印调试信息
+		if packetInfo.DstIP == "139.155.132.244" || packetInfo.SrcIP == "139.155.132.244" {
+			fmt.Printf("调试: 捕获到目标IP %s 的数据包，域名: %s, Host: %s\n",
+				packetInfo.DstIP, packetInfo.Domain, packetInfo.Host)
 		}
 	}
 
@@ -136,16 +143,66 @@ func (c *Capturer) parseHTTP(packet gopacket.Packet, packetInfo *storage.PacketI
 	// 简单的HTTP解析
 	payloadStr := string(payload)
 
-	// 检查是否是HTTP请求
-	if len(payloadStr) > 4 && (payloadStr[:4] == "GET " || payloadStr[:4] == "POST" ||
-		payloadStr[:4] == "PUT " || payloadStr[:4] == "HEAD" || payloadStr[:4] == "DELE") {
+	// 调试信息：打印原始payload的前100个字符
+	if packetInfo.DstIP == "139.155.132.244" || packetInfo.SrcIP == "139.155.132.244" {
+		preview := payloadStr
+		if len(preview) > 100 {
+			preview = preview[:100]
+		}
+		fmt.Printf("调试: HTTP payload预览: %s\n", preview)
+	}
+
+	// 检查是否是HTTP请求 - 增强检测逻辑
+	if c.isHTTPRequest(payloadStr) {
 		c.parseHTTPRequest(payloadStr, packetInfo)
 	}
 
 	// 检查是否是HTTP响应
-	if len(payloadStr) > 4 && payloadStr[:4] == "HTTP" {
+	if c.isHTTPResponse(payloadStr) {
 		c.parseHTTPResponse(payloadStr, packetInfo)
 	}
+}
+
+// isHTTPRequest 检查是否是HTTP请求
+func (c *Capturer) isHTTPRequest(payload string) bool {
+	if len(payload) < 4 {
+		return false
+	}
+
+	// 检查常见的HTTP方法
+	httpMethods := []string{"GET ", "POST", "PUT ", "HEAD", "DELE", "PATCH", "OPTIONS", "TRACE"}
+	for _, method := range httpMethods {
+		if len(payload) >= len(method) && payload[:len(method)] == method {
+			return true
+		}
+	}
+
+	// 检查是否包含HTTP头部特征
+	lines := splitLines(payload)
+	if len(lines) >= 2 {
+		// 第一行是请求行，第二行应该包含Host头部
+		for _, line := range lines[1:] {
+			if strings.HasPrefix(strings.ToLower(line), "host:") {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// isHTTPResponse 检查是否是HTTP响应
+func (c *Capturer) isHTTPResponse(payload string) bool {
+	if len(payload) < 4 {
+		return false
+	}
+
+	// 检查HTTP版本
+	if strings.HasPrefix(payload, "HTTP/") {
+		return true
+	}
+
+	return false
 }
 
 func (c *Capturer) parseHTTPRequest(payload string, packetInfo *storage.PacketInfo) {
@@ -160,25 +217,35 @@ func (c *Capturer) parseHTTPRequest(payload string, packetInfo *storage.PacketIn
 	if len(parts) >= 3 {
 		packetInfo.HTTPMethod = parts[0]
 		packetInfo.HTTPURL = parts[1]
+
+		// 解析URL，提取域名和路径
+		c.parseURL(parts[1], packetInfo)
 	}
 
-	// 解析头部
+	// 解析头部 - 增强解析逻辑
 	for _, line := range lines[1:] {
 		if line == "" {
 			break
 		}
-		if colonIndex := findColon(line); colonIndex > 0 {
-			key := line[:colonIndex]
-			value := line[colonIndex+1:]
-			if len(value) > 0 && value[0] == ' ' {
-				value = value[1:]
-			}
 
-			switch key {
-			case "User-Agent":
-				packetInfo.UserAgent = value
-			case "Content-Type":
-				packetInfo.ContentType = value
+		// 查找冒号位置
+		colonIndex := findColon(line)
+		if colonIndex > 0 {
+			key := strings.TrimSpace(line[:colonIndex])
+			value := strings.TrimSpace(line[colonIndex+1:])
+
+			// 特别处理Host头部
+			if strings.ToLower(key) == "host" {
+				packetInfo.Host = value
+				// 提取域名（去掉端口）
+				colonIndex := strings.Index(value, ":")
+				if colonIndex > 0 {
+					packetInfo.Domain = value[:colonIndex]
+				} else {
+					packetInfo.Domain = value
+				}
+			} else {
+				c.parseHeader(key, value, packetInfo)
 			}
 		}
 	}
@@ -209,11 +276,117 @@ func (c *Capturer) parseHTTPResponse(payload string, packetInfo *storage.PacketI
 				value = value[1:]
 			}
 
-			switch key {
-			case "Content-Type":
-				packetInfo.ContentType = value
-			}
+			c.parseHeader(key, value, packetInfo)
 		}
+	}
+}
+
+// parseURL 解析URL，提取域名和路径
+func (c *Capturer) parseURL(url string, packetInfo *storage.PacketInfo) {
+	// 处理相对URL
+	if strings.HasPrefix(url, "/") {
+		packetInfo.Path = url
+		return
+	}
+
+	// 处理完整URL
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		// 提取协议后的部分
+		urlPart := url
+		if strings.HasPrefix(url, "http://") {
+			urlPart = url[7:]
+		} else if strings.HasPrefix(url, "https://") {
+			urlPart = url[8:]
+		}
+
+		// 查找第一个斜杠
+		slashIndex := strings.Index(urlPart, "/")
+		if slashIndex > 0 {
+			packetInfo.Host = urlPart[:slashIndex]
+			packetInfo.Path = urlPart[slashIndex:]
+		} else {
+			packetInfo.Host = urlPart
+			packetInfo.Path = "/"
+		}
+
+		// 提取域名（去掉端口）
+		colonIndex := strings.Index(packetInfo.Host, ":")
+		if colonIndex > 0 {
+			packetInfo.Domain = packetInfo.Host[:colonIndex]
+		} else {
+			packetInfo.Domain = packetInfo.Host
+		}
+	}
+}
+
+// parseHeader 解析HTTP头部
+func (c *Capturer) parseHeader(key, value string, packetInfo *storage.PacketInfo) {
+	switch key {
+	case "Host":
+		packetInfo.Host = value
+		// 提取域名（去掉端口）
+		colonIndex := strings.Index(value, ":")
+		if colonIndex > 0 {
+			packetInfo.Domain = value[:colonIndex]
+		} else {
+			packetInfo.Domain = value
+		}
+	case "User-Agent":
+		packetInfo.UserAgent = value
+	case "Content-Type":
+		packetInfo.ContentType = value
+	case "Referer":
+		packetInfo.Referer = value
+	case "Server":
+		packetInfo.Server = value
+	case "Set-Cookie":
+		packetInfo.SetCookie = value
+	case "Cookie":
+		packetInfo.Cookie = value
+	case "Authorization":
+		packetInfo.Authorization = value
+	case "Accept":
+		packetInfo.Accept = value
+	case "Accept-Language":
+		packetInfo.AcceptLanguage = value
+	case "Accept-Encoding":
+		packetInfo.AcceptEncoding = value
+	case "Connection":
+		packetInfo.Connection = value
+	case "Cache-Control":
+		packetInfo.CacheControl = value
+	case "Pragma":
+		packetInfo.Pragma = value
+	case "If-Modified-Since":
+		packetInfo.IfModifiedSince = value
+	case "If-None-Match":
+		packetInfo.IfNoneMatch = value
+	case "Range":
+		packetInfo.Range = value
+	case "Content-Length":
+		packetInfo.ContentLength = value
+	case "Transfer-Encoding":
+		packetInfo.TransferEncoding = value
+	case "Location":
+		packetInfo.Location = value
+	case "Last-Modified":
+		packetInfo.LastModified = value
+	case "ETag":
+		packetInfo.ETag = value
+	case "Expires":
+		packetInfo.Expires = value
+	case "Date":
+		packetInfo.Date = value
+	case "Age":
+		packetInfo.Age = value
+	case "Via":
+		packetInfo.Via = value
+	case "X-Forwarded-For":
+		packetInfo.XForwardedFor = value
+	case "X-Real-IP":
+		packetInfo.XRealIP = value
+	case "X-Requested-With":
+		packetInfo.XRequestedWith = value
 	}
 }
 
