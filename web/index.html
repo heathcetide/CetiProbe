@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Probe - 网络抓包工具</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Probe - 网络抓包工具</h1>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">总数据包:</span>
+                    <span id="total-packets" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">HTTP:</span>
+                    <span id="http-packets" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">HTTPS:</span>
+                    <span id="https-packets" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">唯一IP:</span>
+                    <span id="unique-ips" class="stat-value">0</span>
+                </div>
+                <button id="clear-btn" class="btn btn-danger">清空数据</button>
+                <button id="export-btn" class="btn btn-success">导出数据</button>
+            </div>
+        </header>
+
+        <div class="filters">
+            <h3>过滤器</h3>
+            <div class="filter-row">
+                <input type="text" id="src-ip" placeholder="源IP地址">
+                <input type="text" id="dst-ip" placeholder="目标IP地址">
+                <input type="number" id="port" placeholder="端口号">
+                <select id="protocol">
+                    <option value="">所有协议</option>
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                    <option value="IPv4">IPv4</option>
+                    <option value="IPv6">IPv6</option>
+                </select>
+                <select id="http-method">
+                    <option value="">所有HTTP方法</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="HEAD">HEAD</option>
+                </select>
+                <input type="text" id="search-text" placeholder="搜索文本">
+                <button id="filter-btn" class="btn btn-primary">应用过滤</button>
+                <button id="reset-filter-btn" class="btn btn-secondary">重置</button>
+            </div>
+        </div>
+
+        <div class="packets-container">
+            <h3>数据包列表</h3>
+            <div class="packets-table-container">
+                <table id="packets-table" class="packets-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>源IP:端口</th>
+                            <th>目标IP:端口</th>
+                            <th>协议</th>
+                            <th>长度</th>
+                            <th>HTTP方法</th>
+                            <th>URL</th>
+                            <th>状态</th>
+                            <th>User Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="packets-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
