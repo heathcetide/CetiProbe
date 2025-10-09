@@ -1,6 +1,7 @@
 package layer
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -120,4 +121,46 @@ type NetworkLayerInfo struct {
 	IsDstLinkLocal bool `json:"is_dst_link_local"` // 目标IP是否为链路本地地址
 	IsSrcIPValid   bool `json:"is_src_ip_valid"`   // 源IP地址是否有效
 	IsDstIPValid   bool `json:"is_dst_ip_valid"`   // 目标IP地址是否有效
+}
+
+// PrintNetworkLayerInfo 打印网络层信息
+func PrintNetworkLayerInfo(networkInfo *NetworkLayerInfo) {
+	fmt.Println("  Network Layer 详细信息:")
+	fmt.Printf("    时间戳: %v\n", networkInfo.Timestamp)
+	fmt.Printf("    IP版本: %d\n", networkInfo.IPVersion)
+	fmt.Printf("    源IP: %s\n", networkInfo.SrcIP)
+	fmt.Printf("    目标IP: %s\n", networkInfo.DstIP)
+	fmt.Printf("    协议: %s\n", networkInfo.Protocol)
+	fmt.Printf("    长度: %d 字节\n", networkInfo.Length)
+
+	if networkInfo.IPVersion == 4 {
+		fmt.Printf("    TTL: %d\n", networkInfo.TTL)
+		fmt.Printf("    首部长度(IHL): %d\n", networkInfo.IHL)
+		fmt.Printf("    服务类型(TOS): %d\n", networkInfo.TOS)
+		fmt.Printf("    标识符: %d\n", networkInfo.Identifier)
+		fmt.Printf("    标志位: %d\n", networkInfo.Flags)
+		fmt.Printf("    片偏移: %d\n", networkInfo.FragOffset)
+		fmt.Printf("    校验和: %d\n", networkInfo.Checksum)
+
+		if len(networkInfo.Options) > 0 {
+			fmt.Printf("    选项长度: %d 字节\n", len(networkInfo.Options))
+		}
+
+		if len(networkInfo.Padding) > 0 {
+			fmt.Printf("    填充长度: %d 字节\n", len(networkInfo.Padding))
+		}
+	} else if networkInfo.IPVersion == 6 {
+		fmt.Printf("    流量类别: %d\n", networkInfo.TrafficClass)
+		fmt.Printf("    流标签: %d\n", networkInfo.FlowLabel)
+		fmt.Printf("    下一报头: %s\n", networkInfo.NextHeader)
+		fmt.Printf("    跳数限制(HopLimit): %d\n", networkInfo.HopLimit)
+	}
+
+	// 打印地址类型标记
+	fmt.Printf("    源IP有效性: %t\n", networkInfo.IsSrcIPValid)
+	fmt.Printf("    目标IP有效性: %t\n", networkInfo.IsDstIPValid)
+	fmt.Printf("    源IP为环回地址: %t\n", networkInfo.IsSrcLoopback)
+	fmt.Printf("    目标IP为环回地址: %t\n", networkInfo.IsDstLoopback)
+	fmt.Printf("    源IP为链路本地地址: %t\n", networkInfo.IsSrcLinkLocal)
+	fmt.Printf("    目标IP为链路本地地址: %t\n", networkInfo.IsDstLinkLocal)
 }

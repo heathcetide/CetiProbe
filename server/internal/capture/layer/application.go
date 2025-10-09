@@ -3,6 +3,7 @@ package layer
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,7 +20,7 @@ type ApplicationLayerInfo struct {
 	Timestamp time.Time `json:"timestamp"` // 数据包捕获时间
 
 	// 应用层数据
-	Payload     []byte            `json:"payload,omitempty"`      // 原始载荷数据
+	Payload     string            `json:"payload,omitempty"`      // 原始载荷数据 (base64编码)
 	HTTPMethod  string            `json:"http_method,omitempty"`  // HTTP方法 (GET, POST等)
 	HTTPVersion string            `json:"http_version,omitempty"` // HTTP版本
 	HTTPStatus  string            `json:"http_status,omitempty"`  // HTTP状态码文本
@@ -44,9 +45,10 @@ type ApplicationLayerInfo struct {
 	Connection     string `json:"connection,omitempty"`      // Connection头部
 
 	// URL解析字段
-	Domain string `json:"domain,omitempty"` // 域名
-	Path   string `json:"path,omitempty"`   // 路径
-	Query  string `json:"query,omitempty"`  // 查询参数
+	Domain  string `json:"domain,omitempty"`   // 域名
+	Path    string `json:"path,omitempty"`     // 路径
+	Query   string `json:"query,omitempty"`    // 查询参数
+	FullURL string `json:"full_url,omitempty"` // 完整URL
 }
 
 // ExtractApplicationLayerInfo 提取应用层信息并填充到ApplicationLayerInfo结构体中
@@ -60,10 +62,9 @@ func ExtractApplicationLayerInfo(appLayer gopacket.ApplicationLayer) *Applicatio
 		return info
 	}
 
-	// 获取原始载荷数据
+	// 获取原始载荷数据并转换为base64编码
 	payload := appLayer.Payload()
-	info.Payload = make([]byte, len(payload))
-	copy(info.Payload, payload)
+	info.Payload = base64.StdEncoding.EncodeToString(payload)
 
 	// 尝试解析HTTP数据
 	if len(payload) > 0 {
@@ -114,6 +115,34 @@ func ExtractApplicationLayerInfo(appLayer gopacket.ApplicationLayer) *Applicatio
 			info.Domain = extractDomainFromHost(request.Host)
 			info.Path = extractPathFromURL(request.RequestURI)
 			info.Query = extractQueryFromURL(request.RequestURI)
+
+			// 智能检测协议类型
+			scheme := "http"
+			// 检查TLS
+			if request.TLS != nil {
+				scheme = "https"
+			}
+			// 检查端口号
+			if strings.Contains(request.Host, ":") {
+				parts := strings.Split(request.Host, ":")
+				if len(parts) > 1 {
+					port := parts[1]
+					if port == "443" {
+						scheme = "https"
+					}
+				}
+			}
+			// 检查Referer头
+			if referer := request.Header.Get("Referer"); referer != "" {
+				if strings.HasPrefix(referer, "https://") {
+					scheme = "https"
+				}
+			}
+
+			// 只有当我们有足够信息时才生成完整URL
+			if info.Domain != "" && (info.Path != "" || request.RequestURI != "") {
+				info.FullURL = generateFullURL(scheme, info.Domain, info.Path, info.Query)
+			}
 
 			return info
 		}
@@ -204,9 +233,46 @@ func extractQueryFromURL(url string) string {
 	return ""
 }
 
+// 生成完整URL
+func generateFullURL(scheme, domain, path, query string) string {
+	if domain == "" {
+		return ""
+	}
+
+	// 移除域名末尾的点（DNS格式常见）
+	domain = strings.TrimSuffix(domain, ".")
+
+	url := scheme + "://" + domain
+
+	// 确保路径存在且格式正确
+	if path == "" {
+		path = "/"
+		url += path
+	} else {
+		// 确保路径以/开头
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+		url += path
+	}
+
+	// 添加查询参数
+	if query != "" {
+		url += "?" + query
+	}
+
+	return url
+}
+
 // PrintApplicationLayerDetails 打印应用层详细信息
 func PrintApplicationLayerDetails(appInfo *ApplicationLayerInfo) {
 	fmt.Println("  Application Layer 详细信息:")
+
+	if appInfo.FullURL != "" {
+		fmt.Printf("    完整URL: %s\n", appInfo.FullURL)
+	} else if appInfo.Domain != "" {
+		fmt.Printf("    域名: %s\n", appInfo.Domain)
+	}
 
 	if appInfo.HTTPMethod != "" {
 		fmt.Printf("    HTTP方法: %s\n", appInfo.HTTPMethod)
@@ -255,24 +321,22 @@ func PrintApplicationLayerDetails(appInfo *ApplicationLayerInfo) {
 		fmt.Printf("    消息体长度: %d 字节\n", len(appInfo.Body))
 	}
 
-	// 检查是否为可打印的文本数据
-	if len(appInfo.Payload) > 0 {
-		if isLikelyText(appInfo.Payload) {
-			// 可打印文本
-			if len(appInfo.Payload) <= 256 {
-				fmt.Printf("    原始载荷: %s\n", string(appInfo.Payload))
-			} else {
-				fmt.Printf("    原始载荷: %s... (%d 字节)\n", string(appInfo.Payload[:256]), len(appInfo.Payload))
+	// 显示base64编码的载荷数据
+	if appInfo.Payload != "" {
+		// 解码base64数据以获取原始长度
+		if decoded, err := base64.StdEncoding.DecodeString(appInfo.Payload); err == nil {
+			fmt.Printf("    原始载荷: %d 字节的base64编码数据\n", len(decoded))
+
+			// 如果数据较短，显示解码后的内容
+			if len(decoded) <= 256 && isLikelyText(decoded) {
+				fmt.Printf("    解码内容: %s\n", string(decoded))
+			} else if len(decoded) > 0 {
+				// 显示前几个字节的十六进制表示
+				hexData := fmt.Sprintf("%x", decoded[:min(16, len(decoded))])
+				fmt.Printf("    前%d字节十六进制: %s\n", min(16, len(decoded)), hexData)
 			}
 		} else {
-			// 二进制数据或加密数据
-			fmt.Printf("    原始载荷: 包含 %d 字节的二进制/加密数据\n", len(appInfo.Payload))
-
-			// 显示前几个字节的十六进制表示
-			if len(appInfo.Payload) > 0 {
-				hexData := fmt.Sprintf("%x", appInfo.Payload[:min(16, len(appInfo.Payload))])
-				fmt.Printf("    前%d字节十六进制: %s\n", min(16, len(appInfo.Payload)), hexData)
-			}
+			fmt.Printf("    原始载荷: %s (base64编码)\n", appInfo.Payload)
 		}
 	}
 }

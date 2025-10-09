@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"probe/internal/models"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -85,18 +86,18 @@ func (s *SQLiteStorage) createTables() error {
 }
 
 // StorePacket 存储一个数据包
-func (s *SQLiteStorage) StorePacket(packet *PacketInfo) {
+func (s *SQLiteStorage) StorePacket(packet *models.PacketInfo) {
 	// TODO: 实现 SQLite 存储逻辑
 }
 
 // GetPackets 获取指定数量的最新数据包
-func (s *SQLiteStorage) GetPackets(limit int) []*PacketInfo {
+func (s *SQLiteStorage) GetPackets(limit int) []*models.PacketInfo {
 	// TODO: 实现 SQLite 查询逻辑
 	return nil
 }
 
 // GetPacketsByFilter 根据过滤条件获取数据包
-func (s *SQLiteStorage) GetPacketsByFilter(filter Filter) []*PacketInfo {
+func (s *SQLiteStorage) GetPacketsByFilter(filter Filter) []*models.PacketInfo {
 	// TODO: 实现 SQLite 过滤查询逻辑
 	return nil
 }

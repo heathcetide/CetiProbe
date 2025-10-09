@@ -1,37 +1,26 @@
 package storage
 
 import (
-	"probe/internal/capture/layer"
+	"probe/internal/models"
 	"time"
 )
 
 // Storage 是存储接口，定义了所有存储实现必须支持的方法
 type Storage interface {
 	// StorePacket 存储一个数据包
-	StorePacket(packet *PacketInfo)
+	StorePacket(packet *models.PacketInfo)
 
 	// GetPackets 获取指定数量的最新数据包
-	GetPackets(limit int) []*PacketInfo
+	GetPackets(limit int) []*models.PacketInfo
 
 	// GetPacketsByFilter 根据过滤条件获取数据包
-	GetPacketsByFilter(filter Filter) []*PacketInfo
+	GetPacketsByFilter(filter Filter) []*models.PacketInfo
 
 	// Clear 清空所有数据包
 	Clear()
 
 	// GetStats 获取统计信息
 	GetStats() Stats
-}
-
-// PacketInfo 表示网络数据包的信息
-type PacketInfo struct {
-	ID               int64 `json:"id"` // 数据包唯一标识
-	Metadata         layer.PacketMetadataInfo
-	LinkLayer        layer.LinkLayerInfo
-	NetworkLayer     layer.NetworkLayerInfo
-	TransportLayer   layer.TransportLayerInfo
-	ApplicationLayer layer.ApplicationLayerInfo
-	ErrorLayer       layer.ErrorLayerInfo
 }
 
 // Filter 用于过滤数据包的条件

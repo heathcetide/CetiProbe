@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"probe/internal/models"
 	"strings"
 	"sync"
 	"time"
@@ -8,7 +9,7 @@ import (
 
 // MemoryStorage 是基于内存的存储实现
 type MemoryStorage struct {
-	packets []*PacketInfo
+	packets []*models.PacketInfo
 	mu      sync.RWMutex
 	stats   Stats
 	ipSet   map[string]bool
@@ -18,7 +19,7 @@ type MemoryStorage struct {
 // NewMemoryStorage 创建一个新的内存存储实例
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		packets: make([]*PacketInfo, 0),
+		packets: make([]*models.PacketInfo, 0),
 		stats: Stats{
 			StartTime: time.Now(),
 		},
@@ -28,7 +29,7 @@ func NewMemoryStorage() *MemoryStorage {
 }
 
 // StorePacket 存储一个数据包
-func (m *MemoryStorage) StorePacket(packet *PacketInfo) {
+func (m *MemoryStorage) StorePacket(packet *models.PacketInfo) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -66,7 +67,7 @@ func (m *MemoryStorage) StorePacket(packet *PacketInfo) {
 }
 
 // GetPackets 获取指定数量的最新数据包
-func (m *MemoryStorage) GetPackets(limit int) []*PacketInfo {
+func (m *MemoryStorage) GetPackets(limit int) []*models.PacketInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -81,11 +82,11 @@ func (m *MemoryStorage) GetPackets(limit int) []*PacketInfo {
 }
 
 // GetPacketsByFilter 根据过滤条件获取数据包
-func (m *MemoryStorage) GetPacketsByFilter(filter Filter) []*PacketInfo {
+func (m *MemoryStorage) GetPacketsByFilter(filter Filter) []*models.PacketInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	result := make([]*PacketInfo, 0)
+	result := make([]*models.PacketInfo, 0)
 
 	// 遍历所有数据包
 	for _, packet := range m.packets {
@@ -98,7 +99,7 @@ func (m *MemoryStorage) GetPacketsByFilter(filter Filter) []*PacketInfo {
 }
 
 // matchesFilter 检查数据包是否匹配过滤条件
-func (m *MemoryStorage) matchesFilter(packet *PacketInfo, filter Filter) bool {
+func (m *MemoryStorage) matchesFilter(packet *models.PacketInfo, filter Filter) bool {
 	// 协议过滤
 	if filter.Protocol != "" && packet.TransportLayer.Protocol != filter.Protocol {
 		return false
@@ -194,7 +195,7 @@ func (m *MemoryStorage) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.packets = make([]*PacketInfo, 0)
+	m.packets = make([]*models.PacketInfo, 0)
 	m.stats = Stats{
 		StartTime: time.Now(),
 	}

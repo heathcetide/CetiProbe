@@ -1,6 +1,7 @@
 package layer
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/gopacket"
@@ -17,6 +18,16 @@ type LinkLayerInfo struct {
 	DstMAC  string `json:"dst_mac,omitempty"`  // 目标MAC地址
 	EthType string `json:"eth_type,omitempty"` // 以太网类型
 	Length  int    `json:"length,omitempty"`   // 帧长度
+}
+
+// PrintLinkLayerInfo 打印链路层信息
+func PrintLinkLayerInfo(linkInfo *LinkLayerInfo) {
+	fmt.Println("  Link Layer 详细信息:")
+	fmt.Printf("    时间戳: %v\n", linkInfo.Timestamp)
+	fmt.Printf("    源MAC: %s\n", linkInfo.SrcMAC)
+	fmt.Printf("    目标MAC: %s\n", linkInfo.DstMAC)
+	fmt.Printf("    以太网类型: %s\n", linkInfo.EthType)
+	fmt.Printf("    长度: %d 字节\n", linkInfo.Length)
 }
 
 // ExtractLinkLayerInfo 提取链路层信息并填充到LinkLayerInfo结构体中

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"probe/internal/models"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -91,18 +92,18 @@ func (s *MySQLStorage) createTables() error {
 }
 
 // StorePacket 存储一个数据包
-func (s *MySQLStorage) StorePacket(packet *PacketInfo) {
+func (s *MySQLStorage) StorePacket(packet *models.PacketInfo) {
 	// TODO: 实现 MySQL 存储逻辑
 }
 
 // GetPackets 获取指定数量的最新数据包
-func (s *MySQLStorage) GetPackets(limit int) []*PacketInfo {
+func (s *MySQLStorage) GetPackets(limit int) []*models.PacketInfo {
 	// TODO: 实现 MySQL 查询逻辑
 	return nil
 }
 
 // GetPacketsByFilter 根据过滤条件获取数据包
-func (s *MySQLStorage) GetPacketsByFilter(filter Filter) []*PacketInfo {
+func (s *MySQLStorage) GetPacketsByFilter(filter Filter) []*models.PacketInfo {
 	// TODO: 实现 MySQL 过滤查询逻辑
 	return nil
 }

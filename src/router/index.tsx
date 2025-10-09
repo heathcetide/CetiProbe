@@ -19,6 +19,7 @@ import Frame from "../pages/frame";
 import Colors from "../pages/colors";
 import Toast from "../pages/toast";
 import Combobox from "../pages/combobox";
+import CaptureHome from "../pages/capture-home";
 import App from "../App.tsx";
 
 function Router() {
@@ -30,6 +31,10 @@ function Router() {
         {
           path: "/",
           element: <Home />,
+        },
+        {
+          path: "/capture",
+          element: <CaptureHome />,
         },
         {
           path: "/docs",
