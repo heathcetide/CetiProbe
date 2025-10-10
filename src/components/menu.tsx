@@ -4,24 +4,77 @@ import { NavLink } from "react-router";
 import { MobileMenuContext } from "../App";
 import { X } from "lucide-react";
 
-function Main() {
+interface MenuProps {
+  className?: string;
+  position?: "fixed" | "relative" | "absolute";
+  showCloseButton?: boolean;
+  variant?: "sidebar" | "dropdown" | "inline";
+}
+
+function Main({ 
+  className, 
+  position = "fixed", 
+  showCloseButton = true,
+  variant = "sidebar"
+}: MenuProps) {
   const { showMenu, setShowMenu } = useContext(MobileMenuContext);
+
+  // 根据variant决定样式
+  const getVariantStyles = () => {
+    switch (variant) {
+      case "sidebar":
+        return [
+          "before:fixed before:absolute before:w-screen before:left-0 before:top-0 before:h-screen before:bg-background/5 before:backdrop-blur before:z-[-1]",
+          "after:fixed after:absolute after:inset-0 after:bg-background/80 after:border-r after:border-primary/30 lg:after:backdrop-none after:z-[-1]",
+          "pt-10 top-0 left-0 w-70 lg:w-[25%] xl:w-[15%] lg:top-30 bottom-0 lg:pt-0 lg:pt-10 pl-10 z-60 -ml-[100%] transition-[margin] lg:left-auto lg:ml-0 before:hidden after:hidden [&.active]:ml-0 [&.active]:after:block [&.active]:before:block [&.active]:lg:before:hidden [&.active]:lg:after:hidden",
+          showMenu && "active"
+        ];
+      case "dropdown":
+        return [
+          "relative bg-background border border-primary/20 rounded-lg shadow-lg p-4",
+          "transform transition-all duration-200",
+          showMenu ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+        ];
+      case "inline":
+        return [
+          "flex flex-col gap-2 text-foreground/70",
+          "transition-all duration-200"
+        ];
+      default:
+        return [];
+    }
+  };
+
+  const getPositionStyles = () => {
+    switch (position) {
+      case "fixed":
+        return "fixed";
+      case "absolute":
+        return "absolute";
+      case "relative":
+        return "relative";
+      default:
+        return "relative";
+    }
+  };
 
   return (
     <div
       className={twMerge([
-        "before:fixed before:absolute before:w-screen before:left-0 before:top-0 before:h-screen before:bg-background/5 before:backdrop-blur before:z-[-1]",
-        "after:fixed after:absolute after:inset-0 after:bg-background/80 after:border-r after:border-primary/30 lg:after:backdrop-none after:z-[-1]",
-        "pt-10 top-0 left-0 fixed flex flex-col gap-10 text-foreground/50 w-70 lg:w-[25%] xl:w-[15%] lg:top-30 bottom-0 lg:pt-0 lg:pt-10 pl-10 z-60 -ml-[100%] transition-[margin] lg:left-auto lg:ml-0 before:hidden after:hidden [&.active]:ml-0 [&.active]:after:block [&.active]:before:block [&.active]:lg:before:hidden [&.active]:lg:after:hidden",
-        showMenu && "active",
+        getPositionStyles(),
+        "flex flex-col gap-10 text-foreground/50",
+        ...getVariantStyles(),
+        className
       ])}
     >
-      <div
-        onClick={() => setShowMenu(false)}
-        className="absolute top-0 right-0 -mr-14 mt-8 cursor-pointer text-foreground lg:hidden"
-      >
-        <X className="size-6" />
-      </div>
+      {showCloseButton && (
+        <div
+          onClick={() => setShowMenu(false)}
+          className="absolute top-0 right-0 -mr-14 mt-8 cursor-pointer text-foreground lg:hidden"
+        >
+          <X className="size-6" />
+        </div>
+      )}
       <div className="flex flex-col">
         <div className="font-medium text-foreground mb-2">Getting Started</div>
         <NavLink

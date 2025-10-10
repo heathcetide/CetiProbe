@@ -1,5 +1,4 @@
 import { twMerge } from "tailwind-merge";
-import { Frame } from "@/components/ui/frame";
 import { Check } from "lucide-react";
 import { Checkbox } from "@ark-ui/react/checkbox";
 
@@ -11,7 +10,7 @@ function CheckboxRoot({
   return (
     <Checkbox.Root
       className={twMerge([
-        "flex gap-3.5 items-center cursor-pointer",
+        "flex items-center space-x-2",
         className,
       ])}
       {...rest}
@@ -27,7 +26,13 @@ function CheckboxLabel({
   ...rest
 }: React.ComponentProps<typeof Checkbox.Label>) {
   return (
-    <Checkbox.Label className={twMerge(["order-2", className])} {...rest}>
+    <Checkbox.Label 
+      className={twMerge([
+        "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+        className
+      ])} 
+      {...rest}
+    >
       {children}
     </Checkbox.Label>
   );
@@ -40,19 +45,15 @@ function CheckboxControl({
   return (
     <Checkbox.Control
       className={twMerge([
-        "group relative size-5 flex items-center justify-center data-[state=checked]:drop-shadow-[0_0px_20px_var(--color-primary)]",
-        "[--color-frame-1-stroke:var(--color-primary)]/80",
-        "[--color-frame-1-fill:var(--color-primary)]/10",
+        "peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        "data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
         className,
       ])}
       {...rest}
     >
-      <Frame
-        paths={JSON.parse(
-          '[{"show":true,"style":{"strokeWidth":"1","stroke":"var(--color-frame-1-stroke)","fill":"var(--color-frame-1-fill)"},"path":[["M","50% - 28.125%","0"],["L","50% + 28.125%","0"],["L","100% + 0","50% - 28.125%"],["L","100% + 0","50% + 28.125%"],["L","50% + 28.125%","100% - 0"],["L","50% - 28.125%","100% + 0"],["L","0","50% + 28.125%"],["L","0","50% - 28.125%"],["L","50% - 28.125%","0"]]}]'
-        )}
-      />
-      <Check className="group-data-[state=checked]:opacity-100 opacity-0 size-6 -mt-1 -mr-2 stroke-(--color-primary)/80 drop-shadow-[0_0px_2px_var(--color-primary)] transition-all duration-100" />
+      <Check className="h-4 w-4" />
     </Checkbox.Control>
   );
 }

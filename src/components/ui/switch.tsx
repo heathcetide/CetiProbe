@@ -1,4 +1,3 @@
-import { Frame } from "@/components/ui/frame";
 import { twMerge } from "tailwind-merge";
 import { Switch } from "@ark-ui/react/switch";
 
@@ -9,7 +8,7 @@ function SwitchRoot({
 }: React.ComponentProps<typeof Switch.Root>) {
   return (
     <Switch.Root
-      className={twMerge(["flex items-center gap-4", className])}
+      className={twMerge(["flex items-center gap-3", className])}
       {...rest}
     >
       {children}
@@ -29,22 +28,14 @@ function SwitchControl({
   return (
     <Switch.Control
       className={twMerge([
-        "group relative w-14 h-6 flex items-center p-1 cursor-pointer",
-        "[--color-frame-1-stroke:var(--color-primary)]/70",
-        "[--color-frame-1-fill:var(--color-primary)]/10",
-        "data-[state=checked]:[--color-frame-1-stroke:var(--color-primary)]",
-        "data-[state=checked]:[--color-frame-1-fill:var(--color-primary)]/20",
+        "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        "data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
         className,
       ])}
       {...rest}
     >
-      <div className="absolute inset-0 z-[-1]">
-        <Frame
-          paths={JSON.parse(
-            '[{"show":true,"style":{"strokeWidth":"1","stroke":"var(--color-frame-1-stroke)","fill":"var(--color-frame-1-fill)"},"path":[["M","11","0"],["L","100% + 0","0"],["L","100% + 0","100% + 0"],["L","0","100% + 0"],["L","0","0% + 12"],["L","11","0"]]}]'
-          )}
-        />
-      </div>
       {children}
     </Switch.Control>
   );
@@ -57,22 +48,12 @@ function SwitchThumb({
   return (
     <Switch.Thumb
       className={twMerge([
-        "relative w-1/2 h-3.5 z-[-1] -mb-px transition-all ms-0.5",
-        "[--color-frame-1-stroke:var(--color-primary)]/80",
-        "[--color-frame-1-fill:var(--color-primary)]/20",
-        "group-data-[state=checked]:[--color-frame-1-stroke:var(--color-primary)]",
-        "group-data-[state=checked]:[--color-frame-1-fill:var(--color-primary)]/30",
-        "group-data-[state=checked]:ms-[47%] group-data-[state=checked]:drop-shadow-[0_0px_20px_var(--color-primary)]",
+        "pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform",
+        "data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0",
         className,
       ])}
       {...rest}
-    >
-      <Frame
-        paths={JSON.parse(
-          '[{"show":true,"style":{"strokeWidth":"1","stroke":"var(--color-frame-1-stroke)","fill":"var(--color-frame-1-fill)"},"path":[["M","7","0"],["L","100% + 0","0"],["L","100% + 0","100% + 0"],["L","0","100% + 0"],["L","0","0% + 7"],["L","7","0"]]}]'
-        )}
-      />
-    </Switch.Thumb>
+    />
   );
 }
 
@@ -82,7 +63,13 @@ function SwitchLabel({
   ...rest
 }: React.ComponentProps<typeof Switch.Label>) {
   return (
-    <Switch.Label className={className} {...rest}>
+    <Switch.Label 
+      className={twMerge([
+        "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+        className
+      ])} 
+      {...rest}
+    >
       {children}
     </Switch.Label>
   );

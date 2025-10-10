@@ -46,7 +46,15 @@ function MenuPositioner({
 }: React.ComponentProps<typeof Menu.Positioner>) {
   return (
     <Portal>
-      <Menu.Positioner className={className} {...rest}>
+      <Menu.Positioner 
+        className={twMerge([
+          "z-50", // 确保菜单在最上层
+          // 覆盖Ark UI的默认定位，使其更灵活
+          "!relative", // 强制使用相对定位
+          className
+        ])} 
+        {...rest}
+      >
         {children}
       </Menu.Positioner>
     </Portal>
@@ -62,8 +70,15 @@ function MenuContent({
     <Menu.Content
       className={twMerge([
         "group relative min-w-(--reference-width) px-6 py-7 outline-none mt-1.5",
+        // 更灵活的定位，支持自定义位置
+        "data-[placement^='bottom']:mt-2 data-[placement^='top']:mb-2",
+        "data-[placement^='left']:mr-2 data-[placement^='right']:ml-2",
+        // 确保不使用固定定位
+        "!relative", // 强制相对定位
+        // 动画效果
         "[&[data-state='open']]:animate-in [&[data-state='open']]:zoom-in-80 [&[data-state='open']]:fade-in-0 [&[data-state='open']]:duration-200 [&[data-state='open'][data-placement='bottom-start']]:slide-in-from-top-2 [&[data-state='open'][data-placement='left-start']]:slide-in-from-right-2 [&[data-state='open'][data-placement='right-start']]:slide-in-from-left-2 [&[data-state='open'][data-placement='top-start']]:slide-in-from-bottom-2",
         "[&[data-state='closed']]:animate-out [&[data-state='closed']]:zoom-out-80 [&[data-state='closed']]:fade-out-0 [&[data-state='closed']]:duration-200",
+        // 颜色变量
         "[--color-frame-1-stroke:var(--color-primary)]",
         "[--color-frame-1-fill:var(--color-primary)]/20",
         "[--color-frame-2-stroke:var(--color-accent)]",

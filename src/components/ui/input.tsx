@@ -1,39 +1,29 @@
-import { Frame } from "@/components/ui/frame";
 import { twMerge } from "tailwind-merge";
+import { forwardRef } from "react";
 
-function Input({
-  className,
-  children,
-  variant = "lifted",
-  type,
-  ...props
-}: React.ComponentProps<"input"> & {
-  variant?: "flat" | "lifted" | "simple";
-}) {
-  return (
-    <div
-      className={twMerge([
-        "relative",
-        "[--color-frame-1-stroke:var(--color-primary)]/70",
-        "[--color-frame-1-fill:var(--color-primary)]/10",
-        "[--color-frame-2-stroke:transparent]",
-        "[--color-frame-2-fill:transparent]",
-      ])}
-    >
-      <div className="absolute inset-0 -mb-2 [&>svg]:drop-shadow-[0_0px_20px_var(--color-primary)]">
-        <Frame
-          paths={JSON.parse(
-            '[{"show":true,"style":{"strokeWidth":"1","stroke":"var(--color-frame-1-stroke)","fill":"var(--color-frame-1-fill)"},"path":[["M","17","0"],["L","100% - 7","0"],["L","100% + 0","0% + 9.5"],["L","100% - 18","100% - 6"],["L","4","100% - 6"],["L","0","100% - 15"],["L","17","0"]]},{"show":true,"style":{"strokeWidth":"1","stroke":"var(--color-frame-2-stroke)","fill":"var(--color-frame-2-fill)"},"path":[["M","9","100% - 6"],["L","100% - 22","100% - 6"],["L","100% - 25","100% + 0"],["L","12","100% + 0"],["L","9","100% - 6"]]}]'
+const Input = forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <div className="relative group">
+        <input
+          type={type}
+          className={twMerge(
+            "flex h-10 w-full rounded-lg border border-white/20 bg-white/5 backdrop-blur-sm px-4 py-2 text-sm text-white placeholder:text-white/60",
+            "transition-all duration-300 ease-out",
+            "focus:outline-none focus:border-white/40 focus:bg-white/10 focus:shadow-lg focus:shadow-white/10",
+            "hover:border-white/30 hover:bg-white/8",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            "group-hover:shadow-md group-hover:shadow-white/5",
+            className
           )}
+          ref={ref}
+          {...props}
         />
+        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-white/10 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </div>
-      <input
-        type={type}
-        className="w-full outline-none px-8 py-2 relative placeholder:text-foreground/70"
-        {...props}
-      />
-    </div>
-  );
-}
+    );
+  }
+);
+Input.displayName = "Input";
 
 export { Input };

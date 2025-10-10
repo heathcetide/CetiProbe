@@ -2,32 +2,23 @@
 @import "tw-animate-css";
 
 @theme {
-  --background-image-temper: url("assets/images/temper.svg");
-  --background-image-noise: url("assets/images/noise.png");
-
-  --color-primary: rgb(20, 160, 230);
-  /* --color-primary: var(--color-sky-400); */
-  --color-primary-foreground: rgb(255, 255, 255);
-  --color-accent: rgb(202, 65, 34);
-  --color-accent-foreground: rgb(255, 255, 255);
-  --color-secondary: --alpha(
-    color-mix(in oklab, var(--color-primary), var(--color-white) 50%) / 60%
-  );
-  --color-secondary-foreground: color-mix(
-    in oklab,
-    var(--color-primary),
-    var(--color-white) 70%
-  );
-  --color-destructive: var(--color-rose-500);
-  --color-destructive-foreground: rgb(255, 255, 255);
-  --color-success: var(--color-teal-500);
-  --color-success-foreground: rgb(255, 255, 255);
-  --color-background: color-mix(
-    in oklab,
-    var(--color-primary),
-    var(--color-black) 80%
-  );
-  --color-foreground: var(--color-white);
+  --color-primary: hsl(221, 83%, 53%);
+  --color-primary-foreground: hsl(210, 40%, 98%);
+  --color-accent: hsl(210, 40%, 98%);
+  --color-accent-foreground: hsl(222.2, 84%, 4.9%);
+  --color-secondary: hsl(210, 40%, 96%);
+  --color-secondary-foreground: hsl(222.2, 84%, 4.9%);
+  --color-destructive: hsl(0, 84.2%, 60.2%);
+  --color-destructive-foreground: hsl(210, 40%, 98%);
+  --color-success: hsl(142, 76%, 36%);
+  --color-success-foreground: hsl(210, 40%, 98%);
+  --color-background: hsl(0, 0%, 100%);
+  --color-foreground: hsl(222.2, 84%, 4.9%);
+  --color-muted: hsl(210, 40%, 96%);
+  --color-muted-foreground: hsl(215.4, 16.3%, 46.9%);
+  --color-border: hsl(214.3, 31.8%, 91.4%);
+  --color-input: hsl(214.3, 31.8%, 91.4%);
+  --color-ring: hsl(221, 83%, 53%);
 
   --font-orbitron: "Orbitron", sans-serif;
   --font-roboto: "Roboto", sans-serif;
@@ -81,21 +72,8 @@
 }
 
 body {
-  @apply bg-background overflow-x-hidden bg-fixed antialiased text-sm font-orbitron text-foreground tracking-wider;
-  background-image: repeating-linear-gradient(
-      0deg,
-      --alpha(var(--color-foreground) / 5%) 0,
-      --alpha(var(--color-foreground) / 5%) 1px,
-      transparent 1px,
-      transparent 35rem
-    ),
-    repeating-linear-gradient(
-      90deg,
-      --alpha(var(--color-foreground) / 5%) 0,
-      --alpha(var(--color-foreground) / 5%) 1px,
-      transparent 1px,
-      transparent 35rem
-    );
+  @apply bg-background antialiased text-sm text-foreground;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .typing-container {

@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>网络抓包监控面板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .json-viewer {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0.8;
+    }
+    .copy-btn:hover {
+      opacity: 1;
+    }
+    .body-container {
+      position: relative;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-7xl mx-auto p-6">
+    <h1 class="text-2xl font-bold mb-4">网络抓包监控面板</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="p-4 bg-white rounded shadow">
+        <div class="text-sm text-gray-500">运行状态</div>
+        <div id="statusText" class="text-lg font-semibold mt-1">-</div>
+      </div>
+      <div class="p-4 bg-white rounded shadow">
+        <div class="text-sm text-gray-500">统计</div>
+        <div id="statsText" class="text-lg font-semibold mt-1">-</div>
+      </div>
+      <div class="p-4 bg-white rounded shadow">
+        <div class="text-sm text-gray-500">抓包控制(PCAP)</div>
+        <div class="mt-2 flex items-center gap-2">
+          <input id="ifaceInput" type="text" placeholder="填 /api/interfaces 返回的 Name" class="border rounded px-2 py-1 w-64" />
+          <button id="startBtn" class="px-3 py-1 bg-green-600 text-white rounded">开始</button>
+          <button id="stopBtn" class="px-3 py-1 bg-red-600 text-white rounded">停止</button>
+          <button id="clearBtn" class="px-3 py-1 bg-gray-600 text-white rounded">清空</button>
+        </div>
+      </div>
+      <div class="p-4 bg-white rounded shadow md:col-span-3">
+        <div class="text-sm text-gray-500">代理(MITM)</div>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <input id="proxyAddr" type="text" class="border rounded px-2 py-1 w-40" value=":8899" />
+          <label class="inline-flex items-center gap-1 text-sm text-gray-700"><input id="proxyHttps" type="checkbox" class="border" /><span>HTTPS(MITM)</span></label>
+          <button id="proxyStart" class="px-3 py-1 bg-emerald-600 text-white rounded">启动代理</button>
+          <button id="proxyStop" class="px-3 py-1 bg-rose-600 text-white rounded">停止代理</button>
+          <button id="downloadCertBtn" class="px-3 py-1 bg-indigo-600 text-white rounded">下载并安装证书</button>
+          <button id="manualInstallBtn" class="px-3 py-1 bg-gray-500 text-white rounded text-xs">手动安装指引</button>
+          <span id="proxyStatus" class="text-sm text-gray-600"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded shadow">
+      <div class="flex items-center justify-between p-4 border-b">
+        <div class="font-semibold">最近数据包（PCAP）</div>
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">数量</label>
+          <input id="limitInput" type="number" value="200" class="border rounded px-2 py-1 w-24" />
+          <button id="refreshBtn" class="px-3 py-1 bg-blue-600 text-white rounded">刷新</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-3 py-2 text-left">时间</th>
+              <th class="px-3 py-2 text-left">源IP</th>
+              <th class="px-3 py-2 text-left">目的IP</th>
+              <th class="px-3 py-2 text-left">协议</th>
+              <th class="px-3 py-2 text-left">端口</th>
+              <th class="px-3 py-2 text-left">域名/URL</th>
+              <th class="px-3 py-2 text-left">方法</th>
+              <th class="px-3 py-2 text-left">状态</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-white rounded shadow mt-6">
+      <div class="flex items-center justify-between p-4 border-b">
+        <div class="font-semibold">HTTP Flows（代理采集）</div>
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">数量</label>
+          <input id="flowsLimit" type="number" value="200" class="border rounded px-2 py-1 w-24" />
+          <button id="flowsRefresh" class="px-3 py-1 bg-blue-600 text-white rounded">刷新</button>
+          <button id="showStatsBtn" class="px-3 py-1 bg-purple-600 text-white rounded text-xs">统计信息</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-3 py-2 text-left">开始时间</th>
+              <th class="px-3 py-2 text-left">方法</th>
+              <th class="px-3 py-2 text-left">主机</th>
+              <th class="px-3 py-2 text-left">路径</th>
+              <th class="px-3 py-2 text-left">查询</th>
+              <th class="px-3 py-2 text-left">状态码</th>
+              <th class="px-3 py-2 text-left">耗时(ms)</th>
+              <th class="px-3 py-2 text-left">操作</th>
+            </tr>
+          </thead>
+          <tbody id="flowsBody"></tbody>
+        </table>
+      </div>
+      <div id="flowsHint" class="p-4 text-sm text-gray-600 hidden">未采集到数据。请确认系统/浏览器已将 HTTP/HTTPS 代理都设置为 127.0.0.1:8899；建议先访问 http://neverssl.com 进行 HTTP 测试，或用 curl 测试 HTTPS：<code>curl -x http://127.0.0.1:8899 -k https://example.com</code>。</div>
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => {
+      const element = document.getElementById(id);
+      if (!element) {
+        console.warn(`Element with id '${id}' not found`);
+      }
+      return element;
+    };
+
+    async function apiGet(path) {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+    async function apiPost(path) {
+      const res = await fetch(path, { method: 'POST' });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+    async function apiDelete(path) {
+      const res = await fetch(path, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    function fmt(s) { return s ?? ''; }
+    function timeStr(ts) { if (!ts) return ''; return new Date(ts).toLocaleString(); }
+
+    async function refresh() {
+      try {
+        const [status, stats, proxyS] = await Promise.all([
+          apiGet('/api/status'),
+          apiGet('/api/stats'),
+          apiGet('/api/proxy/status')
+        ]);
+        el('statusText').textContent = `${status.running ? '运行中' : '已停止'} ${status.iface ? '(' + status.iface + ')' : ''}`;
+        el('statsText').textContent = `总包: ${stats.total_packets} | HTTP: ${stats.http_packets} | HTTPS: ${stats.https_packets}`;
+        el('proxyStatus').textContent = `代理: ${proxyS.running ? '运行中' : '已停止'} (设置系统代理为 http://127.0.0.1:${(el('proxyAddr').value||':8899').replace(':','')})`;
+
+        const limit = parseInt(el('limitInput').value || '200', 10);
+        const packets = await apiGet('/api/packets?limit=' + limit);
+        const rows = packets.map(p => {
+          const t = p?.metadata?.capture_time || p?.applicationLayer?.timestamp || '';
+          const src = p?.networkLayer?.src_ip || p?.networkLayer?.SrcIP || '';
+          const dst = p?.networkLayer?.dst_ip || p?.networkLayer?.DstIP || '';
+          const proto = p?.transportLayer?.protocol || p?.transportLayer?.Protocol || '';
+          const sport = p?.transportLayer?.src_port || p?.transportLayer?.SrcPort || '';
+          const dport = p?.transportLayer?.dst_port || p?.transportLayer?.DstPort || '';
+          const domain = p?.applicationLayer?.full_url || p?.applicationLayer?.domain || '';
+          const method = p?.applicationLayer?.http_method || '';
+          const status = p?.applicationLayer?.status_code || '';
+          return `<tr class="border-t">
+            <td class="px-3 py-2">${fmt(timeStr(t))}</td>
+            <td class="px-3 py-2">${fmt(src)}</td>
+            <td class="px-3 py-2">${fmt(dst)}</td>
+            <td class="px-3 py-2">${fmt(proto)}</td>
+            <td class="px-3 py-2">${fmt(sport)} → ${fmt(dport)}</td>
+            <td class="px-3 py-2 truncate max-w-[320px]">${fmt(domain)}</td>
+            <td class="px-3 py-2">${fmt(method)}</td>
+            <td class="px-3 py-2">${fmt(status)}</td>
+          </tr>`;
+        }).join('');
+        el('tableBody').innerHTML = rows;
+
+        // flows
+        const fLimit = parseInt(el('flowsLimit').value || '200', 10);
+        const flows = await apiGet('/api/flows?limit=' + fLimit);
+        const fRows = flows.map((f, index) => {
+          const t = f?.start_at;
+          const r = f?.request || {};
+          const s = f?.response || {};
+          return `<tr class="border-t">
+            <td class="px-3 py-2">${fmt(timeStr(t))}</td>
+            <td class="px-3 py-2">${fmt(r.method)}</td>
+            <td class="px-3 py-2">${fmt(r.host)}</td>
+            <td class="px-3 py-2 truncate max-w-[260px]">${fmt(r.path)}</td>
+            <td class="px-3 py-2 truncate max-w-[260px]">${fmt(r.query)}</td>
+            <td class="px-3 py-2">${fmt(s.status_code)}</td>
+            <td class="px-3 py-2">${fmt(f.latency_ms)}</td>
+            <td class="px-3 py-2">
+              <button class="flow-detail-btn px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600" data-flow-id="${f.id}">详情</button>
+            </td>
+          </tr>`;
+        }).join('');
+        el('flowsBody').innerHTML = fRows;
+        el('flowsHint').classList.toggle('hidden', flows.length > 0);
+      } catch (e) {
+        console.error(e);
+        alert('刷新失败: ' + e.message);
+      }
+    }
+
+    // 安全地添加事件监听器
+    const addEventListenerSafe = (element, event, handler) => {
+      if (element) {
+        element.addEventListener(event, handler);
+      }
+    };
+
+    addEventListenerSafe(el('refreshBtn'), 'click', refresh);
+    addEventListenerSafe(el('startBtn'), 'click', async () => {
+      const iface = el('ifaceInput').value.trim();
+      if (!iface) return alert('请输入网卡名（/api/interfaces 的 Name 字段）');
+      try { await apiPost('/api/start?iface=' + encodeURIComponent(iface)); } catch(e) { return alert('启动失败: ' + e.message); }
+      await refresh();
+    });
+    addEventListenerSafe(el('stopBtn'), 'click', async () => {
+      try { await apiPost('/api/stop'); } catch(e) { return alert('停止失败: ' + e.message); }
+      await refresh();
+    });
+    addEventListenerSafe(el('clearBtn'), 'click', async () => {
+      try { await apiDelete('/api/packets'); } catch(e) { return alert('清空失败: ' + e.message); }
+      await refresh();
+    });
+
+    addEventListenerSafe(el('proxyStart'), 'click', async () => {
+      const addr = el('proxyAddr').value || ':8899';
+      const https = el('proxyHttps').checked ? '1' : '0';
+      try { 
+        // 先尝试停止现有代理，然后启动新代理
+        try { await apiPost('/api/proxy/stop'); } catch(e) { /* 忽略停止错误 */ }
+        await apiPost('/api/proxy/start?addr=' + encodeURIComponent(addr) + '&https=' + https); 
+      } catch(e) { 
+        return alert('代理启动失败: ' + e.message); 
+      }
+      await refresh();
+    });
+    addEventListenerSafe(el('proxyStop'), 'click', async () => {
+      try { await apiPost('/api/proxy/stop'); } catch(e) { return alert('代理停止失败: ' + e.message); }
+      await refresh();
+    });
+    addEventListenerSafe(el('flowsRefresh'), 'click', refresh);
+
+    // 检测操作系统
+    function detectOS() {
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.indexOf('mac') !== -1) return 'darwin';
+      if (ua.indexOf('win') !== -1) return 'windows';
+      if (ua.indexOf('linux') !== -1) return 'linux';
+      return 'darwin';
+    }
+
+    // 下载并尝试自动安装证书
+    addEventListenerSafe(el('downloadCertBtn'), 'click', async () => {
+      const os = detectOS();
+      try {
+        // 先下载证书文件
+        const link = document.createElement('a');
+        link.href = '/api/proxy/ca';
+        link.download = 'proxy_root_ca.pem';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 等待下载完成后尝试获取安装指引
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 显示安装指引
+        const resp = await apiGet('/api/proxy/ca/instructions?os=' + os);
+        showInstallModal(resp.instructions, os);
+        
+        // 提示用户
+        alert('证书已下载！\n\n如果遇到导入错误，请尝试以下方法：\n1. 双击证书文件，选择"登录"钥匙串\n2. 手动设置信任为"始终信任"\n3. 或使用终端命令安装');
+      } catch (e) {
+        alert('下载失败: ' + e.message);
+      }
+    });
+
+    // 显示手动安装指引
+    addEventListenerSafe(el('manualInstallBtn'), 'click', async () => {
+      const os = detectOS();
+      try {
+        const resp = await apiGet('/api/proxy/ca/instructions?os=' + os);
+        showInstallModal(resp.instructions, os);
+      } catch (e) {
+        alert('获取安装指引失败: ' + e.message);
+      }
+    });
+
+    // 显示模态框
+    function showInstallModal(instructions, os) {
+      el('modalTitle').textContent = instructions.title || '证书安装指引';
+      
+      const content = el('modalContent');
+      content.innerHTML = '';
+      
+      if (Array.isArray(instructions.steps)) {
+        instructions.steps.forEach(step => {
+          const p = document.createElement('p');
+          p.textContent = step;
+          p.className = 'text-gray-700';
+          content.appendChild(p);
+        });
+      }
+      
+      el('installCommand').textContent = instructions.command || '请参考上方步骤手动安装';
+      el('certModal').classList.remove('hidden');
+    }
+
+    // 使用事件委托处理证书模态框
+    document.addEventListener('click', (e) => {
+      // 关闭证书模态框
+      if (e.target.id === 'closeModal') {
+        el('certModal').classList.add('hidden');
+      }
+      // 点击证书模态框外部关闭
+      if (e.target.id === 'certModal') {
+        el('certModal').classList.add('hidden');
+      }
+      // 复制命令
+      if (e.target.id === 'copyCommand') {
+        const cmd = el('installCommand').textContent;
+        navigator.clipboard.writeText(cmd).then(() => {
+          alert('命令已复制到剪贴板！');
+        }).catch(() => {
+          alert('复制失败，请手动复制');
+        });
+      }
+    });
+
+    // Flow详情相关功能
+    async function showFlowDetail(flowId) {
+      try {
+        const flow = await apiGet('/api/flows/' + flowId + '?decoded=1');
+        showFlowDetailModal(flow);
+      } catch (e) {
+        alert('获取Flow详情失败: ' + e.message);
+      }
+    }
+
+    function showFlowDetailModal(flow) {
+      const content = el('flowDetailContent');
+      content.innerHTML = '';
+
+      // 基本信息
+      const basicInfo = `
+        <div class="bg-gray-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">基本信息</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>ID:</strong> ${flow.id}</div>
+            <div><strong>协议:</strong> ${flow.scheme}</div>
+            <div><strong>远程地址:</strong> ${flow.remote_addr}</div>
+            <div><strong>开始时间:</strong> ${timeStr(flow.start_at)}</div>
+            <div><strong>结束时间:</strong> ${timeStr(flow.end_at)}</div>
+            <div><strong>耗时:</strong> ${flow.latency_ms}ms</div>
+          </div>
+        </div>
+      `;
+
+      // 请求信息
+      const request = flow.request || {};
+      const requestInfo = `
+        <div class="bg-blue-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">HTTP 请求</h3>
+          <div class="space-y-2">
+            <div><strong>方法:</strong> ${request.method}</div>
+            <div><strong>URL:</strong> ${request.url}</div>
+            <div><strong>路径:</strong> ${request.path}</div>
+            <div><strong>查询参数:</strong> ${request.query}</div>
+            <div><strong>主机:</strong> ${request.host}</div>
+            <div><strong>协议:</strong> ${request.proto}</div>
+            <div><strong>长度:</strong> ${request.length} bytes</div>
+          </div>
+          ${request.headers ? `
+            <div class="mt-3">
+              <strong>请求头:</strong>
+              <pre class="bg-white p-2 rounded border text-xs overflow-x-auto">${JSON.stringify(request.headers, null, 2)}</pre>
+            </div>
+          ` : ''}
+          ${request.body && request.body.length > 0 ? `
+            <div class="mt-3">
+              <strong>请求体 (${request.body.length} bytes):</strong>
+              <div class="body-container bg-white p-2 rounded border text-xs max-h-60 overflow-auto">
+                <button class="copy-btn" onclick="copyToClipboard(this.nextElementSibling.textContent)">复制</button>
+                <pre class="whitespace-pre-wrap break-words json-viewer">${formatBody(request.body)}</pre>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // 响应信息
+      const response = flow.response || {};
+      const responseInfo = `
+        <div class="bg-green-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">HTTP 响应</h3>
+          <div class="space-y-2">
+            <div><strong>状态:</strong> ${response.status}</div>
+            <div><strong>状态码:</strong> ${response.status_code}</div>
+            <div><strong>协议:</strong> ${response.proto}</div>
+            <div><strong>长度:</strong> ${response.length} bytes</div>
+          </div>
+          ${response.headers ? `
+            <div class="mt-3">
+              <strong>响应头:</strong>
+              <pre class="bg-white p-2 rounded border text-xs overflow-x-auto">${JSON.stringify(response.headers, null, 2)}</pre>
+            </div>
+          ` : ''}
+          ${response.body_text ? `
+            <div class="mt-3">
+              <strong>响应体 (解码后):</strong>
+              <div class="body-container bg-white p-2 rounded border text-xs max-h-60 overflow-auto">
+                <button class="copy-btn" onclick="copyToClipboard(this.nextElementSibling.textContent)">复制</button>
+                <pre class="whitespace-pre-wrap break-words json-viewer">${formatResponseBody(response.body_text)}</pre>
+              </div>
+            </div>
+          ` : response.body && response.body.length > 0 ? `
+            <div class="mt-3">
+              <strong>响应体 (${response.body.length} bytes):</strong>
+              <div class="body-container bg-white p-2 rounded border text-xs max-h-60 overflow-auto">
+                <button class="copy-btn" onclick="copyToClipboard(this.nextElementSibling.textContent)">复制</button>
+                <pre class="whitespace-pre-wrap break-words json-viewer">${formatBody(response.body)}</pre>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // 性能指标
+      const performanceInfo = flow.performance ? `
+        <div class="bg-purple-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">性能指标</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>DNS解析:</strong> ${flow.performance.dns_lookup_time || 0}ms</div>
+            <div><strong>TCP连接:</strong> ${flow.performance.tcp_connect_time || 0}ms</div>
+            <div><strong>TLS握手:</strong> ${flow.performance.tls_handshake_time || 0}ms</div>
+            <div><strong>首字节时间:</strong> ${flow.performance.ttfb || 0}ms</div>
+            <div><strong>内容传输:</strong> ${flow.performance.content_transfer_time || 0}ms</div>
+            <div><strong>总时间:</strong> ${flow.performance.total_time || flow.latency_ms}ms</div>
+          </div>
+        </div>
+      ` : '';
+
+      // TLS信息
+      const tlsInfo = flow.tls ? `
+        <div class="bg-yellow-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">TLS信息</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>版本:</strong> ${flow.tls.version}</div>
+            <div><strong>加密套件:</strong> ${flow.tls.cipher_suite}</div>
+            <div><strong>安全连接:</strong> ${flow.tls.is_secure ? '是' : '否'}</div>
+            <div><strong>协议:</strong> ${flow.tls.protocol}</div>
+            ${flow.tls.certificate ? `
+              <div><strong>证书主题:</strong> ${flow.tls.certificate.subject}</div>
+              <div><strong>证书颁发者:</strong> ${flow.tls.certificate.issuer}</div>
+              <div><strong>有效期:</strong> ${new Date(flow.tls.certificate.not_before).toLocaleDateString()} - ${new Date(flow.tls.certificate.not_after).toLocaleDateString()}</div>
+              <div><strong>是否有效:</strong> ${flow.tls.certificate.is_valid ? '是' : '否'}</div>
+              <div><strong>自签名:</strong> ${flow.tls.certificate.is_self_signed ? '是' : '否'}</div>
+            ` : ''}
+          </div>
+        </div>
+      ` : '';
+
+      // 网络信息
+      const networkInfo = flow.network ? `
+        <div class="bg-indigo-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">网络信息</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>客户端IP:</strong> ${flow.network.client_ip}</div>
+            <div><strong>服务器IP:</strong> ${flow.network.server_ip}</div>
+            <div><strong>客户端端口:</strong> ${flow.network.client_port}</div>
+            <div><strong>服务器端口:</strong> ${flow.network.server_port}</div>
+            <div><strong>IPv6:</strong> ${flow.network.is_ipv6 ? '是' : '否'}</div>
+            <div><strong>本地:</strong> ${flow.network.is_localhost ? '是' : '否'}</div>
+            <div><strong>私有IP:</strong> ${flow.network.is_private ? '是' : '否'}</div>
+            ${flow.network.country ? `<div><strong>国家:</strong> ${flow.network.country}</div>` : ''}
+            ${flow.network.region ? `<div><strong>地区:</strong> ${flow.network.region}</div>` : ''}
+            ${flow.network.city ? `<div><strong>城市:</strong> ${flow.network.city}</div>` : ''}
+            ${flow.network.isp ? `<div><strong>ISP:</strong> ${flow.network.isp}</div>` : ''}
+          </div>
+        </div>
+      ` : '';
+
+      // 内容信息
+      const contentInfo = flow.content ? `
+        <div class="bg-pink-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">内容信息</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>MIME类型:</strong> ${flow.content.mime_type}</div>
+            <div><strong>编码:</strong> ${flow.content.encoding || '未知'}</div>
+            <div><strong>压缩:</strong> ${flow.content.is_compressed ? flow.content.compression : '无'}</div>
+            <div><strong>原始大小:</strong> ${flow.content.original_size} bytes</div>
+            <div><strong>压缩后大小:</strong> ${flow.content.compressed_size || flow.content.original_size} bytes</div>
+            <div><strong>压缩比:</strong> ${flow.content.compression_ratio ? (flow.content.compression_ratio * 100).toFixed(1) + '%' : 'N/A'}</div>
+            <div><strong>文本:</strong> ${flow.content.is_text ? '是' : '否'}</div>
+            <div><strong>JSON:</strong> ${flow.content.is_json ? '是' : '否'}</div>
+            <div><strong>XML:</strong> ${flow.content.is_xml ? '是' : '否'}</div>
+            <div><strong>图片:</strong> ${flow.content.is_image ? '是' : '否'}</div>
+            <div><strong>视频:</strong> ${flow.content.is_video ? '是' : '否'}</div>
+            <div><strong>音频:</strong> ${flow.content.is_audio ? '是' : '否'}</div>
+          </div>
+        </div>
+      ` : '';
+
+      // 错误信息
+      const errorInfo = flow.error ? `
+        <div class="bg-red-50 p-4 rounded">
+          <h3 class="font-semibold mb-2 text-red-600">错误信息</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>错误类型:</strong> ${flow.error.type}</div>
+            <div><strong>错误代码:</strong> ${flow.error.code}</div>
+            <div><strong>超时:</strong> ${flow.error.is_timeout ? '是' : '否'}</div>
+            <div><strong>重试次数:</strong> ${flow.error.retry_count}</div>
+            <div><strong>网络错误:</strong> ${flow.error.is_network ? '是' : '否'}</div>
+            <div><strong>DNS错误:</strong> ${flow.error.is_dns ? '是' : '否'}</div>
+            <div><strong>TLS错误:</strong> ${flow.error.is_tls ? '是' : '否'}</div>
+            <div class="col-span-2"><strong>错误消息:</strong> ${flow.error.message}</div>
+          </div>
+        </div>
+      ` : '';
+
+      content.innerHTML = basicInfo + performanceInfo + tlsInfo + networkInfo + contentInfo + errorInfo + requestInfo + responseInfo;
+      el('flowDetailModal').classList.remove('hidden');
+    };
+
+    function formatBody(body) {
+      if (typeof body === 'string') {
+        // 尝试Base64解码
+        try {
+          // 检查是否可能是Base64编码的JSON
+          if (body.length > 50 && /^[A-Za-z0-9+/=]+$/.test(body)) {
+            const decoded = atob(body);
+            // 尝试解析为JSON
+            const parsed = JSON.parse(decoded);
+            return JSON.stringify(parsed, null, 2);
+          }
+        } catch (e) {
+          // 如果解码失败，返回原字符串
+        }
+        return body;
+      }
+      if (body instanceof ArrayBuffer || body instanceof Uint8Array) {
+        try {
+          return new TextDecoder('utf-8').decode(body);
+        } catch (e) {
+          return '[Binary data]';
+        }
+      }
+      if (Array.isArray(body)) {
+        try {
+          return new TextDecoder('utf-8').decode(new Uint8Array(body));
+        } catch (e) {
+          return '[Binary data]';
+        }
+      }
+      return String(body);
+    }
+
+    function formatResponseBody(bodyText) {
+      if (!bodyText) return '';
+      
+      // 尝试解析为JSON并格式化
+      try {
+        const parsed = JSON.parse(bodyText);
+        return JSON.stringify(parsed, null, 2);
+      } catch (e) {
+        // 如果不是JSON，直接返回原文本
+        return bodyText;
+      }
+    }
+
+    // 使用事件委托处理模态框关闭
+    document.addEventListener('click', (e) => {
+      // 关闭Flow详情模态框
+      if (e.target.id === 'closeFlowModal') {
+        el('flowDetailModal').classList.add('hidden');
+      }
+      // 点击Flow详情模态框外部关闭
+      if (e.target.id === 'flowDetailModal') {
+        el('flowDetailModal').classList.add('hidden');
+      }
+      // 关闭统计信息模态框
+      if (e.target.id === 'closeStatsModal') {
+        el('statsModal').classList.add('hidden');
+      }
+      // 点击统计信息模态框外部关闭
+      if (e.target.id === 'statsModal') {
+        el('statsModal').classList.add('hidden');
+      }
+    });
+
+    // 使用事件委托处理Flow详情按钮点击
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('flow-detail-btn')) {
+        const flowId = e.target.getAttribute('data-flow-id');
+        if (flowId) {
+          showFlowDetail(flowId);
+        }
+      }
+    });
+
+    // 统计信息功能
+    addEventListenerSafe(el('showStatsBtn'), 'click', async () => {
+      try {
+        const stats = await apiGet('/api/proxy/stats');
+        showStatsModal(stats);
+      } catch (e) {
+        alert('获取统计信息失败: ' + e.message);
+      }
+    });
+
+    function showStatsModal(stats) {
+      const content = el('statsContent');
+      content.innerHTML = '';
+
+      // 网络统计信息
+      const networkStats = stats.network_stats || {};
+      const networkInfo = Object.keys(networkStats).length > 0 ? `
+        <div class="bg-blue-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">网络统计</h3>
+          <div class="space-y-2">
+            ${Object.entries(networkStats).map(([host, stat]) => `
+              <div class="bg-white p-3 rounded border">
+                <div class="font-medium">${host}</div>
+                <div class="grid grid-cols-2 gap-2 text-sm mt-2">
+                  <div><strong>总请求:</strong> ${stat.total_requests}</div>
+                  <div><strong>成功请求:</strong> ${stat.successful_requests}</div>
+                  <div><strong>失败请求:</strong> ${stat.failed_requests}</div>
+                  <div><strong>平均延迟:</strong> ${stat.average_latency}ms</div>
+                  <div><strong>最大延迟:</strong> ${stat.max_latency}ms</div>
+                  <div><strong>最小延迟:</strong> ${stat.min_latency}ms</div>
+                  <div><strong>总字节:</strong> ${stat.total_bytes}</div>
+                  <div><strong>平均字节:</strong> ${stat.average_bytes}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : '<div class="bg-gray-50 p-4 rounded text-center text-gray-500">暂无网络统计信息</div>';
+
+      // 性能统计信息
+      const performanceStats = stats.performance_stats || {};
+      const performanceInfo = Object.keys(performanceStats).length > 0 ? `
+        <div class="bg-green-50 p-4 rounded">
+          <h3 class="font-semibold mb-2">性能统计</h3>
+          <div class="space-y-2">
+            ${Object.entries(performanceStats).map(([flowId, perf]) => `
+              <div class="bg-white p-3 rounded border">
+                <div class="font-medium">Flow ID: ${flowId}</div>
+                <div class="grid grid-cols-2 gap-2 text-sm mt-2">
+                  <div><strong>DNS解析:</strong> ${perf.dns_lookup_time || 0}ms</div>
+                  <div><strong>TCP连接:</strong> ${perf.tcp_connect_time || 0}ms</div>
+                  <div><strong>TLS握手:</strong> ${perf.tls_handshake_time || 0}ms</div>
+                  <div><strong>首字节时间:</strong> ${perf.ttfb || 0}ms</div>
+                  <div><strong>内容传输:</strong> ${perf.content_transfer_time || 0}ms</div>
+                  <div><strong>总时间:</strong> ${perf.total_time || 0}ms</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : '<div class="bg-gray-50 p-4 rounded text-center text-gray-500">暂无性能统计信息</div>';
+
+      content.innerHTML = networkInfo + performanceInfo;
+      el('statsModal').classList.remove('hidden');
+    }
+
+    // 复制到剪贴板功能
+    window.copyToClipboard = async function(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        // 临时显示成功提示
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '已复制!';
+        btn.style.background = '#28a745';
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = '#007bff';
+        }, 1000);
+      } catch (err) {
+        alert('复制失败，请手动复制');
+      }
+    };
+
+    refresh();
+    setInterval(refresh, 4000);
+  </script>
+
+  <!-- 证书安装指引模态框 -->
+  <div id="certModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold" id="modalTitle">证书安装指引</h2>
+        <button id="closeModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+      </div>
+      <div id="modalContent" class="text-sm space-y-2"></div>
+      <div class="mt-4 p-3 bg-gray-100 rounded">
+        <div class="text-xs text-gray-600 mb-1">命令行安装（需要管理员权限）：</div>
+        <code id="installCommand" class="block text-xs bg-white p-2 rounded border select-all"></code>
+        <button id="copyCommand" class="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-xs">复制命令</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- HTTP Flow详情模态框 -->
+    <div id="flowDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">HTTP Flow 详情</h2>
+          <button id="closeFlowModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+        </div>
+        <div id="flowDetailContent" class="text-sm space-y-4"></div>
+      </div>
+    </div>
+
+    <!-- 统计信息模态框 -->
+    <div id="statsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">代理统计信息</h2>
+          <button id="closeStatsModal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+        </div>
+        <div id="statsContent" class="text-sm space-y-4"></div>
+      </div>
+    </div>
+</body>
+</html>
+
+
